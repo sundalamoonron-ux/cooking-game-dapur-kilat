@@ -6,6 +6,7 @@ import {
   TRASH, VIEW, GRILL_SECONDS, BURN_SECONDS, SHIFT_SECONDS,
 } from './config.js';
 import { BIN_ORDER, INGREDIENTS, recipeLabel } from './recipes.js';
+import { drawCustomerFace } from './customers.js';
 import {
   SCREEN_DAY_END, SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE,
   binRect, itemReady, ticketRect,
@@ -136,11 +137,63 @@ export function drawIngredient(ctx, id, state, x, y, width) {
     ctx.lineTo(-48, 10);
     ctx.closePath();
     ctx.fill();
+    // Holes, so the slice reads as cheese and not a plain yellow block.
+    ctx.fillStyle = '#d9a51c';
+    for (const [hx, hy, hr] of [[-28, -4, 5], [8, -6, 4], [28, 0, 5], [-6, 4, 3]]) {
+      ctx.beginPath();
+      ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
 
 // --- kitchen ----------------------------------------------------------------
+
+/** A frying pan hanging from the rail at (x, railY): hook, handle, pan. */
+function drawHangingPan(ctx, x, railY) {
+  ctx.strokeStyle = '#5b3a1e';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, railY);
+  ctx.lineTo(x, railY + 8);
+  ctx.stroke();
+  ctx.fillStyle = '#3a3f47';
+  ctx.beginPath();
+  ctx.arc(x, railY + 20, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#565e6a';
+  ctx.beginPath();
+  ctx.arc(x, railY + 20, 8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** A ladle hanging from the rail at (x, railY). */
+function drawHangingLadle(ctx, x, railY) {
+  ctx.strokeStyle = '#8a8a8a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, railY);
+  ctx.lineTo(x, railY + 20);
+  ctx.stroke();
+  ctx.fillStyle = '#9aa1ad';
+  ctx.beginPath();
+  ctx.arc(x, railY + 26, 8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** A spatula hanging from the rail at (x, railY). */
+function drawHangingSpatula(ctx, x, railY) {
+  ctx.strokeStyle = '#8a6a3f';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, railY);
+  ctx.lineTo(x, railY + 16);
+  ctx.stroke();
+  ctx.fillStyle = '#c9a86a';
+  roundRect(ctx, x - 7, railY + 16, 14, 18, 3);
+  ctx.fill();
+}
 
 function drawBackground(ctx) {
   ctx.fillStyle = COLORS.wall;
@@ -149,6 +202,8 @@ function drawBackground(ctx) {
   for (let x = 0; x < VIEW.width; x += 64) {
     ctx.fillRect(x, 100, 64, 4);
   }
+  // Floor tiles: horizontal and vertical grout lines, so the floor reads
+  // as tiles and not a flat wash.
   ctx.fillStyle = COLORS.floor;
   ctx.fillRect(0, 108, VIEW.width, VIEW.height - 108);
   ctx.strokeStyle = COLORS.floorLine;
@@ -159,6 +214,40 @@ function drawBackground(ctx) {
     ctx.lineTo(VIEW.width, y);
     ctx.stroke();
   }
+  for (let x = 0; x < VIEW.width; x += 64) {
+    ctx.beginPath();
+    ctx.moveTo(x, 108);
+    ctx.lineTo(x, VIEW.height);
+    ctx.stroke();
+  }
+  // Tile backsplash along the wall just above the counter, so the kitchen
+  // reads as a place and not a flat backdrop.
+  for (let x = 0; x < VIEW.width; x += 32) {
+    for (let y = 104; y < 140; y += 18) {
+      ctx.fillStyle = ((x / 32 + y / 18) % 2 === 0) ? '#f2e3c2' : '#e9d3a8';
+      ctx.fillRect(x, y, 31, 17);
+    }
+  }
+  ctx.strokeStyle = '#d8c49a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 140);
+  ctx.lineTo(VIEW.width, 140);
+  ctx.stroke();
+  // A rail with hanging utensils on the wall: pan, ladle, spatula.
+  ctx.strokeStyle = '#8a6a3f';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(48, 106);
+  ctx.lineTo(300, 106);
+  ctx.moveTo(1100, 106);
+  ctx.lineTo(1250, 106);
+  ctx.stroke();
+  drawHangingPan(ctx, 76, 106);
+  drawHangingLadle(ctx, 140, 106);
+  drawHangingSpatula(ctx, 204, 106);
+  drawHangingPan(ctx, 1150, 106);
+  drawHangingLadle(ctx, 1214, 106);
   // The long kitchen counter.
   ctx.fillStyle = COLORS.counterFront;
   ctx.fillRect(24, 148, VIEW.width - 48, 240);
@@ -328,7 +417,7 @@ function drawTopBar(ctx, state) {
   ctx.fill();
   text(ctx, formatTime(state.shiftLeft), 150, 52, 14, '#ffffff');
   if (state.combo >= 2) {
-    text(ctx, 'KOMBO x' + state.combo, 196, 28, 15, '#8fe388', 'center');
+    text(ctx, 'KOMBO x' + state.combo, 248, 28, 14, '#8fe388', 'right');
   }
   // Order board.
   for (let i = 0; i < state.orders.length; i += 1) {
@@ -358,7 +447,9 @@ function drawTicket(ctx, state, order, rect) {
   ctx.fillStyle = order.colour;
   roundRect(ctx, rect.x, rect.y, 10, rect.height, 5);
   ctx.fill();
-  text(ctx, '#' + (order.id + 1) + '  ' + order.recipe.name, rect.x + 20, rect.y + 16, 15, COLORS.ink);
+  // The customer waiting for this order, so the board reads as people.
+  drawCustomerFace(ctx, order.id, rect.x + 23, rect.y + 23, 11);
+  text(ctx, '#' + (order.id + 1) + '  ' + order.recipe.name, rect.x + 40, rect.y + 16, 15, COLORS.ink);
   // Recipe icons.
   let ix = rect.x + 22;
   for (const id of order.recipe.items) {
