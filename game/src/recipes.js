@@ -23,6 +23,8 @@ export const RECIPES = [
   { name: 'Burger Sayur', items: ['bun', 'lettuce', 'tomato', 'cheese'], day: 2 },
   { name: 'Double Sapi', items: ['bun', 'patty', 'patty', 'cheese'], day: 2 },
   { name: 'Burger Spesial', items: ['bun', 'patty', 'lettuce', 'tomato', 'cheese'], day: 3 },
+  { name: 'Double Keju', items: ['bun', 'patty', 'cheese', 'cheese'], day: 3 },
+  { name: 'Burger Sultan', items: ['bun', 'patty', 'patty', 'lettuce', 'tomato', 'cheese'], day: 3 },
 ];
 
 /** Recipes a customer may order on the given day. */
