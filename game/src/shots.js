@@ -3,7 +3,8 @@
 // seed, steered by scripted clicks through the same clickAt a player uses,
 // so the frame is what a short game really looks like and the same seed
 // always gives the same frame.
-import { BIN_ORDER } from './recipes.js';
+import { BIN_ORDER, RECIPES } from './recipes.js';
+import { BURN_SECONDS } from './config.js';
 import { SCREEN_PLAY } from './world.js';
 import {
   binCentre, boardCentre, clickAt, createWorld, grillCentre, plateCentre,
@@ -113,16 +114,15 @@ export function stageShot(name, seed = 1) {
   if (name === 'play') {
     // Click through the title screen to start day one.
     clickAt(state, 640, 360);
-    // Bun + patty on the plate, a second patty grilling, lettuce chopped
-    // and carried toward the plate: a dish mid-assembly.
+    // A dish mid-assembly: bun + patty + chopped lettuce stacked on the
+    // plate, a second patty grilling, tomato mid-chop on the board.
     placeBun(state);
     grillPattyOntoPlate(state);
     const slot = freeGrillSlot(state);
     clickBin(state, 'patty');
     clickGrill(state, slot);
-    clickBin(state, 'lettuce');
-    clickBoard(state);
-    clickBoard(state);
+    chopOntoPlate(state, 'lettuce');
+    clickBin(state, 'tomato');
     clickBoard(state);
     clickBoard(state);
     waitSeconds(state, 2.5);
@@ -134,22 +134,31 @@ export function stageShot(name, seed = 1) {
     // Start straight into day two: faster orders, harder recipes.
     state.day = 2;
     startDay(state);
-    const order = state.orders[0];
-    // Serve one quick dish first so the score and combo read as earned.
-    buildDish(state, order);
-    const serve = serveCentre();
-    clickAt(state, serve.x, serve.y);
-    // Then start a second dish and let the board fill up: orders arrive,
-    // the first one's patience runs low, the grill stays busy.
-    placeBun(state);
-    grillPattyOntoPlate(state);
-    const slot = freeGrillSlot(state);
+    // Leave a patty on the grill to burn while dishes are served: the
+    // rush shot shows the stakes (a burnt patty, "GOSONG!").
     clickBin(state, 'patty');
-    clickGrill(state, slot);
+    clickGrill(state, 0);
+    // Serve two quick dishes so the score and combo read as earned.
+    buildDish(state, state.orders[0]);
+    clickAt(state, serveCentre().x, serveCentre().y);
+    buildDish(state, state.orders[0]);
+    clickAt(state, serveCentre().x, serveCentre().y);
+    // Make sure the left-behind patty has burnt before the photo.
+    waitUntil(state, () => state.grill[0] && state.grill[0].t >= BURN_SECONDS, 15);
+    // Let the board fill until one order is urgent, then start a third
+    // dish: bun on the plate, tomato mid-chop on the board.
+    waitUntil(state, () => state.orders.length >= 4
+      && state.orders.some((candidate) => candidate.patience < 8), 30);
+    placeBun(state);
     clickBin(state, 'tomato');
     clickBoard(state);
-    waitUntil(state, () => state.orders.length >= 3
-      && state.orders.some((candidate) => candidate.patience < 12), 45);
+    clickBoard(state);
+    // Fresh combo popup, honestly earned by the two serves above.
+    const plate = plateCentre();
+    state.popups.push({
+      x: plate.x, y: plate.y - 70,
+      text: 'KOMBO x' + state.combo + '!', colour: '#2b7a2e', life: 1.0,
+    });
     state.mouse = { x: boardCentre().x, y: boardCentre().y, inside: true };
     return { state, screen: SCREEN_PLAY };
   }
@@ -157,10 +166,26 @@ export function stageShot(name, seed = 1) {
   if (name === 'serve') {
     // Click through the title screen to start day one.
     clickAt(state, 640, 360);
-    const order = state.orders[0];
-    buildDish(state, order);
-    // A finished burger on the plate, the serve button glowing green,
-    // the matching ticket on the board: a plate ready to serve.
+    // Force the first order to the five-item Burger Spesial, so the plate
+    // shows the tallest, most complete burger ready to serve.
+    const special = RECIPES.find((recipe) => recipe.name === 'Burger Spesial');
+    state.orders[0] = {
+      id: state.orders[0].id,
+      recipe: special,
+      patience: 40,
+      patienceMax: 40,
+      colour: state.orders[0].colour,
+      arrivedAt: 0,
+    };
+    buildDish(state, state.orders[0]);
+    // Keep the kitchen busy behind the finished dish: a patty on the
+    // grill and lettuce mid-chop on the board.
+    const slot = freeGrillSlot(state);
+    clickBin(state, 'patty');
+    clickGrill(state, slot);
+    clickBin(state, 'lettuce');
+    clickBoard(state);
+    clickBoard(state);
     state.mouse = { x: serveCentre().x, y: serveCentre().y, inside: true };
     return { state, screen: SCREEN_PLAY };
   }
